@@ -19,7 +19,7 @@ from numpy import exp, sqrt, array
 from scipy.spatial import distance_matrix
 
 
-def maternKernel52(data, weights, sig, other=None):
+def maternKernel52(data, other, HPs):
     '''
     Compute the 5/2 matern kernel from a data set, some weights for the different
     data points, and a variance.
@@ -45,11 +45,22 @@ def maternKernel52(data, weights, sig, other=None):
             An n-by-n matrix holding the kernel.  n is the number of data
             points in the input data object.
     '''
+    weights, sig = HPs[:-1], HPs[-1]
     # First step, let's ensure we have correct object
     if isinstance(weights, float):
         weights = [weights]
     data, weights = array(data), array(weights)**0.5
-    n, dim = data.shape
+    # print len(data.shape)
+    if len(data.shape) == 1:
+        data = data.reshape((-1, 1))
+    if len(other.shape) == 1:
+        other = other.reshape((-1, 1))
+    # n, dim = data.shape
+    if any([len(data.shape) == 0, len(other.shape) == 0]):
+        print data
+        print other
+    # print data.shape
+    # print other.shape
 
     # Get the pairwise distance matrix between data points.  Note, because we
     # want to weight the distances based on each dimension, we first multiply
