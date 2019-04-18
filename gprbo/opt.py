@@ -4,12 +4,18 @@ to predict a simple N-dim function.
 '''
 from gprbo.kernels.matern import maternKernel52 as mk52
 from gprbo.hyperparameters import Theta
-from gprbo.testFunctions.simple import f1
+from gprbo.testFunctions.simple import f2 as f1
 
+import os
 import copy
 import numpy as np
+import scipy.stats
 import scipy.linalg
 from scipy import optimize as op
+
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
 
 
 class GPR_BO:
@@ -22,6 +28,11 @@ class GPR_BO:
         self.mean = lambda x: 0.0
         self.cov = mk52
         self.HP = Theta("mk52", self.domain.shape)
+        if len(self.domain.shape) == 1:
+            self.dim = 1
+        else:
+            self.dim = self.domain.shape[1]
+        self.best = None
 
     def likelihood(self, X, Y, HPs):
         '''
@@ -91,10 +102,13 @@ class GPR_BO:
         '''
         assert self.HP is not None, "Error - first set hyperparameters!"
 
+        self.best = max(ty)
+
         mu = map(self.mean, self.domain)
         K = self.cov(self.domain, self.domain, self.HP.values)
 
-        test_x = np.array([x for x in self.domain if x not in tx])
+        # test_x = np.array([x for x in self.domain if x not in tx])
+        test_x = self.domain.copy()
         K_x_x = self.cov(tx, tx, self.HP.values)
         K_xs_x = self.cov(test_x, tx, self.HP.values)
         K_xs_xs = self.cov(test_x, test_x, self.HP.values)
@@ -118,15 +132,54 @@ class GPR_BO:
         self.mu = mu
         self.K = K
 
-    def calculate_expected_improvement(self, domain):
-        pass
+    def sample_expected_improvement(self):
+        '''
+        This function determines the next sample to run based on the
+        Expected Improvement method.
+        '''
+        EI_list = np.array([
+            (self.mu[i] - self.best) * scipy.stats.norm.cdf((self.mu[i] - self.best) / np.sqrt(self.K[i, i])) +
+            np.sqrt(self.K[i, i]) * scipy.stats.norm.pdf((self.mu[i] - self.best) / np.sqrt(self.K[i, i]))
+            if self.K[i, i] > 0 else 0
+            # if (K[i, i] > 0 and i not in samples) else 0
+            for i in range(self.dim)]).reshape((-1, self.dim))[0]
+        next_sample = np.nanargmax(EI_list)
+
+        if np.nanmax([EI_list[next_sample], 0]) <= 0:
+            return np.random.choice([i for i in range(len(self.mu))])
+            # return np.random.choice([i for i in range(len(self.mu)) if i not in samples])
+
+        return next_sample
+
+    def update(self, sx, sy, err=1E-6):
+        '''
+        Do a sequential bayesian posterior update, using the Kalman Filter method.
+        Our Kalman Gain is defined as:
+
+            KG = K[x, :] / (err + K[x, x])
+
+        And the update is then:
+
+            mu_new = mu_old + KG * (y_observered - mu_predicted_at_x)
+        '''
+        if sy > self.best:
+            self.best = sy
+        # This is stupid, figure out numpy search in array instead
+        x = [abs(d - sx) < err for d in domain].index(True)
+        # If the variance is 0 before we account for it, throw an error!
+        assert self.K[x, x] > 0, "Error - Variance is 0!  Possibly double counted a point."
+
+        cov_vec = self.K[x]
+        mu_new = self.mu + (sy - self.mu[x]) / (self.K[x, x] + err) * cov_vec
+        Sig_new = self.K - np.outer(self.K[x, :], self.K[:, x]) / (self.K[x, x] + err)
+        self.mu, self.K = mu_new, Sig_new
 
 
 if __name__ == "__main__":
     domain = np.arange(-5.1, 5.1, 0.01)
     opt = GPR_BO(domain)
     # Using a simple test function, generate training data
-    train_x = np.arange(-5.1, 5.1, 1.0)
+    train_x = np.arange(-5.1, 5.1, 2.0)
     train_y = np.array(map(f1, train_x))
     opt.fit_hp(train_x, train_y)
     opt.train(train_x, train_y)
@@ -136,13 +189,31 @@ if __name__ == "__main__":
     # save the mean and standard deviations.
     means = [copy.deepcopy(opt.mu)]
     stds = [np.diag(opt.K)]
-    for i in range(10):
-        EI = opt.calculate_expected_improvement(domain)
-        sample_x = domain[np.nanargmax(EI)]
+    if not os.path.exists("imgs"):
+        os.mkdir("imgs")
+    for i in range(20):
+        best_index = opt.sample_expected_improvement()
+        sample_x = domain[best_index]
         sample_y = f1(sample_x)
-        opt.train(sample_x, sample_y)
+        opt.update(sample_x, sample_y)
 
         means.append(copy.deepcopy(opt.mu))
         stds.append(np.diag(opt.K))
+
+        plt.plot(domain, means[-1], label="%d" % i)
+        plt.fill_between(
+            domain,
+            means[-1] + 2.0 * stds[-1],
+            means[-1] - 2.0 * stds[-1],
+            alpha=0.5
+        )
+        plt.plot(domain, map(f1, domain), label="EXACT")
+        plt.legend()
+        # plt.show()
+        plt.savefig("imgs/%03d.png" % i)
+        plt.close()
+
+    cmd = "convert -delay 10 -loop 0 $(ls -v imgs/*.png) output.gif"
+    os.system(cmd)
 
     print("Finished!")
