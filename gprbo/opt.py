@@ -181,8 +181,43 @@ if __name__ == "__main__":
     # Using a simple test function, generate training data
     train_x = np.arange(-5.1, 5.1, 2.0)
     train_y = np.array(map(f1, train_x))
+
+    full_sample_x = train_x.copy().tolist()
+    full_sample_y = train_y.copy().tolist()
+
+    plt.plot(domain, 0.0 * domain, color="dodgerblue", label="Mean")
+    STD = np.diag(opt.cov(domain, domain, [1.0, 1.0]))
+    plt.fill_between(
+        domain,
+        2.0 * STD,
+        - 2.0 * STD,
+        alpha=0.5,
+        color="dodgerblue"
+    )
+    plt.plot(domain, map(f1, domain), color="orange", label="EXACT")
+    plt.legend()
+    plt.ylim(-5.0, 20.0)
+    plt.savefig("imgs/prior.png")
+    plt.close()
+
     opt.fit_hp(train_x, train_y)
     opt.train(train_x, train_y)
+
+    plt.scatter(train_x, train_y, color="orange", label="Sampled")
+    plt.plot(domain, opt.mu, color="dodgerblue", label="Mean")
+    STD = np.diag(opt.K)
+    plt.fill_between(
+        domain,
+        opt.mu + 2.0 * STD,
+        opt.mu - 2.0 * STD,
+        alpha=0.5,
+        color="dodgerblue"
+    )
+    plt.plot(domain, map(f1, domain), color="orange", label="EXACT")
+    plt.legend()
+    plt.ylim(-5.0, 20.0)
+    plt.savefig("imgs/%03d.png" % (0))
+    plt.close()
 
     # Repeatedly (100 times) sample the area, using some acquisition
     # function, and train off the newly sampled points.  Each iteration,
@@ -200,20 +235,27 @@ if __name__ == "__main__":
         means.append(copy.deepcopy(opt.mu))
         stds.append(np.diag(opt.K))
 
-        plt.plot(domain, means[-1], label="%d" % i)
+        full_sample_x.append(sample_x)
+        full_sample_y.append(sample_y)
+
+        plt.scatter(full_sample_x, full_sample_y, color="orange", label="Sampled")
+
+        plt.plot(domain, means[-1], color="dodgerblue", label="%d" % i)
         plt.fill_between(
             domain,
             means[-1] + 2.0 * stds[-1],
             means[-1] - 2.0 * stds[-1],
-            alpha=0.5
+            alpha=0.5,
+            color="dodgerblue"
         )
-        plt.plot(domain, map(f1, domain), label="EXACT")
+        plt.plot(domain, map(f1, domain), color="orange", label="EXACT")
         plt.legend()
         # plt.show()
-        plt.savefig("imgs/%03d.png" % i)
+        plt.ylim(-5.0, 20.0)
+        plt.savefig("imgs/%03d.png" % (i + 1))
         plt.close()
 
-    cmd = "convert -delay 10 -loop 0 $(ls -v imgs/*.png) output.gif"
-    os.system(cmd)
+    # cmd = "convert -delay 10 -loop 0 $(ls -v imgs/*.png) output.gif"
+    # os.system(cmd)
 
     print("Finished!")
