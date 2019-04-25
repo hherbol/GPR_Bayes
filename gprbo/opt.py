@@ -4,7 +4,7 @@ to predict a simple N-dim function.
 '''
 from gprbo.kernels.matern import maternKernel52 as mk52
 from gprbo.hyperparameters import Theta
-from gprbo.testFunctions.simple import f2 as f1
+from gprbo.testFunctions.simple import f2
 
 import os
 import copy
@@ -33,6 +33,7 @@ class GPR_BO:
         else:
             self.dim = self.domain.shape[1]
         self.best = None
+        self.sampled_indices = []
 
     def likelihood(self, X, Y, HPs):
         '''
@@ -140,7 +141,7 @@ class GPR_BO:
         EI_list = np.array([
             (self.mu[i] - self.best) * scipy.stats.norm.cdf((self.mu[i] - self.best) / np.sqrt(self.K[i, i])) +
             np.sqrt(self.K[i, i]) * scipy.stats.norm.pdf((self.mu[i] - self.best) / np.sqrt(self.K[i, i]))
-            if self.K[i, i] > 0 else 0
+            if (self.K[i, i] > 0 and i not in self.sampled_indices) else 0
             # if (K[i, i] > 0 and i not in samples) else 0
             for i in range(self.dim)]).reshape((-1, self.dim))[0]
         next_sample = np.nanargmax(EI_list)
@@ -148,6 +149,8 @@ class GPR_BO:
         if np.nanmax([EI_list[next_sample], 0]) <= 0:
             return np.random.choice([i for i in range(len(self.mu))])
             # return np.random.choice([i for i in range(len(self.mu)) if i not in samples])
+
+        self.sampled_indices.append(next_sample)
 
         return next_sample
 
@@ -176,10 +179,13 @@ class GPR_BO:
 
 
 if __name__ == "__main__":
+    f1 = lambda x: -f2(x)
+
     domain = np.arange(-5.1, 5.1, 0.01)
     opt = GPR_BO(domain)
     # Using a simple test function, generate training data
-    train_x = np.arange(-5.1, 5.1, 2.0)
+    opt.sampled_indices = list(range(400, len(domain), 200))
+    train_x = np.array(map(lambda x: domain[x], opt.sampled_indices))
     train_y = np.array(map(f1, train_x))
 
     full_sample_x = train_x.copy().tolist()
