@@ -62,7 +62,7 @@ class GPR_BO:
         # length, sigma = blarg
         X = np.array([np.array(x) for x in X])
 
-        mu = map(self.mean, X)
+        mu = list(map(self.mean, X))
         Sig = self.cov(X, X, HPs)
 
         Sig = Sig + np.eye(len(Sig)) * 1E-6
@@ -105,7 +105,7 @@ class GPR_BO:
 
         self.best = max(ty)
 
-        mu = map(self.mean, self.domain)
+        mu = np.array(list(map(self.mean, self.domain)))
         K = self.cov(self.domain, self.domain, self.HP.values)
 
         # test_x = np.array([x for x in self.domain if x not in tx])
@@ -132,6 +132,13 @@ class GPR_BO:
 
         self.mu = mu
         self.K = K
+
+    def sample_most_uncertain(self):
+        '''
+        This function determines the next sample to run based on
+        the most uncertain.
+        '''
+        return np.nanargmax(np.diag(self.K))
 
     def sample_expected_improvement(self):
         '''
@@ -179,14 +186,17 @@ class GPR_BO:
 
 
 if __name__ == "__main__":
-    f1 = lambda x: -f2(x)
+    if not os.path.exists("imgs"):
+        os.mkdir("imgs")
+
+    f1 = lambda x: f2(x)
 
     domain = np.arange(-5.1, 5.1, 0.01)
     opt = GPR_BO(domain)
     # Using a simple test function, generate training data
     opt.sampled_indices = list(range(400, len(domain), 200))
-    train_x = np.array(map(lambda x: domain[x], opt.sampled_indices))
-    train_y = np.array(map(f1, train_x))
+    train_x = np.array(list(map(lambda x: domain[x], opt.sampled_indices)))
+    train_y = np.array(list(map(f1, train_x)))
 
     full_sample_x = train_x.copy().tolist()
     full_sample_y = train_y.copy().tolist()
@@ -200,9 +210,9 @@ if __name__ == "__main__":
         alpha=0.5,
         color="dodgerblue"
     )
-    plt.plot(domain, map(f1, domain), color="orange", label="EXACT")
+    plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
     plt.legend()
-    plt.ylim(-5.0, 20.0)
+    plt.ylim(-10.0, 10.0)
     plt.savefig("imgs/prior.png")
     plt.close()
 
@@ -219,7 +229,7 @@ if __name__ == "__main__":
         alpha=0.5,
         color="dodgerblue"
     )
-    plt.plot(domain, map(f1, domain), color="orange", label="EXACT")
+    plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
     plt.legend()
     plt.ylim(-5.0, 20.0)
     plt.savefig("imgs/%03d.png" % (0))
@@ -233,7 +243,8 @@ if __name__ == "__main__":
     if not os.path.exists("imgs"):
         os.mkdir("imgs")
     for i in range(20):
-        best_index = opt.sample_expected_improvement()
+        # best_index = opt.sample_expected_improvement()
+        best_index = opt.sample_most_uncertain()
         sample_x = domain[best_index]
         sample_y = f1(sample_x)
         opt.update(sample_x, sample_y)
@@ -254,7 +265,7 @@ if __name__ == "__main__":
             alpha=0.5,
             color="dodgerblue"
         )
-        plt.plot(domain, map(f1, domain), color="orange", label="EXACT")
+        plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
         plt.legend()
         # plt.show()
         plt.ylim(-5.0, 20.0)

@@ -57,10 +57,8 @@ def maternKernel52(data, other, HPs):
         other = other.reshape((-1, 1))
     # n, dim = data.shape
     if any([len(data.shape) == 0, len(other.shape) == 0]):
-        print data
-        print other
-    # print data.shape
-    # print other.shape
+        print(data)
+        print(other)
 
     # Get the pairwise distance matrix between data points.  Note, because we
     # want to weight the distances based on each dimension, we first multiply
