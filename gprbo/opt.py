@@ -3,6 +3,7 @@ This file contains a simple GPR Bayesian Optimizer
 to predict a simple N-dim function.
 '''
 from gprbo.kernels.matern import maternKernel52 as mk52
+from gprbo.kernels.periodic import periodicKernel as pk
 from gprbo.hyperparameters import Theta
 from gprbo.testFunctions.simple import f2
 
@@ -21,13 +22,20 @@ from matplotlib import pyplot as plt
 class GPR_BO:
     '''
     '''
-    def __init__(self, domain):
+    def __init__(self, domain, kern="mk52"):
         self.domain = np.array(domain)
         if len(self.domain.shape) == 1:
             self.domain = self.domain
         self.mean = lambda x: 0.0
-        self.cov = mk52
-        self.HP = Theta("mk52", self.domain.shape)
+
+        if kern == "mk52":
+            self.cov = mk52
+            self.HP = Theta("mk52", self.domain.shape)
+        elif kern == "pk":
+            self.cov = pk
+            self.HP = Theta("pk", self.domain.shape)
+        else:
+            raise Exception("Invalid kern")
         if len(self.domain.shape) == 1:
             self.dim = 1
         else:
@@ -189,12 +197,13 @@ if __name__ == "__main__":
     if not os.path.exists("imgs"):
         os.mkdir("imgs")
 
-    f1 = lambda x: f2(x)
+    f1 = lambda x: -f2(x)
+    kern = "mk52"
 
     domain = np.arange(-5.1, 5.1, 0.01)
-    opt = GPR_BO(domain)
+    opt = GPR_BO(domain, kern=kern)
     # Using a simple test function, generate training data
-    opt.sampled_indices = list(range(400, len(domain), 200))
+    opt.sampled_indices = list(np.random.choice(range(len(domain)), 3, replace=False))
     train_x = np.array(list(map(lambda x: domain[x], opt.sampled_indices)))
     train_y = np.array(list(map(f1, train_x)))
 
@@ -202,7 +211,11 @@ if __name__ == "__main__":
     full_sample_y = train_y.copy().tolist()
 
     plt.plot(domain, 0.0 * domain, color="dodgerblue", label="Mean")
-    STD = np.diag(opt.cov(domain, domain, [1.0, 1.0]))
+    if kern == "mk52":
+        len_HP_w = 2
+    elif kern == "pk":
+        len_HP_w = 3
+    STD = np.diag(opt.cov(domain, domain, [1.0 for _ in range(len_HP_w)]))
     plt.fill_between(
         domain,
         2.0 * STD,
@@ -231,7 +244,7 @@ if __name__ == "__main__":
     )
     plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
     plt.legend()
-    plt.ylim(-5.0, 20.0)
+    plt.ylim(-10.0, 10.0)
     plt.savefig("imgs/%03d.png" % (0))
     plt.close()
 
@@ -243,8 +256,8 @@ if __name__ == "__main__":
     if not os.path.exists("imgs"):
         os.mkdir("imgs")
     for i in range(20):
-        # best_index = opt.sample_expected_improvement()
-        best_index = opt.sample_most_uncertain()
+        best_index = opt.sample_expected_improvement()
+        # best_index = opt.sample_most_uncertain()
         sample_x = domain[best_index]
         sample_y = f1(sample_x)
         opt.update(sample_x, sample_y)
@@ -268,7 +281,7 @@ if __name__ == "__main__":
         plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
         plt.legend()
         # plt.show()
-        plt.ylim(-5.0, 20.0)
+        plt.ylim(-10.0, 10.0)
         plt.savefig("imgs/%03d.png" % (i + 1))
         plt.close()
 

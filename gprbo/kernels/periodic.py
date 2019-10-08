@@ -16,7 +16,7 @@ from numpy import exp, sin, array, pi
 from scipy.spatial import distance_matrix
 
 
-def perodicKernel(data, weights, sig, p, other=None):
+def periodicKernel(data, other, HPs):
     '''
     Compute the periodic kernel from a data set, some weights for the different
     data points, and a variance.
@@ -45,11 +45,21 @@ def perodicKernel(data, weights, sig, p, other=None):
             An n-by-n matrix holding the kernel.  n is the number of data
             points in the input data object.
     '''
+    weights, sig, p = HPs[:-2], HPs[-2], HPs[-1]
+
     # First step, let's ensure we have correct object
     if isinstance(weights, float):
         weights = [weights]
     data, weights = array(data), array(weights)**0.5
-    n, dim = data.shape
+    # print len(data.shape)
+    if len(data.shape) == 1:
+        data = data.reshape((-1, 1))
+    if len(other.shape) == 1:
+        other = other.reshape((-1, 1))
+    # n, dim = data.shape
+    if any([len(data.shape) == 0, len(other.shape) == 0]):
+        print(data)
+        print(other)
 
     # Get the pairwise distance matrix between data points.  Note, because we
     # want to weight the distances based on each dimension, we first multiply

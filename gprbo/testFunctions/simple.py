@@ -17,3 +17,5 @@ def f2(x):
     Product of a periodic and gaussian function.
     '''
     return np.sin(x)**2 * np.exp((2 - x)**2 / 10.0)
+
+
