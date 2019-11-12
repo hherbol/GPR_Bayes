@@ -15,7 +15,7 @@ import scipy.linalg
 from scipy import optimize as op
 
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
 
@@ -141,6 +141,12 @@ class GPR_BO:
         self.mu = mu
         self.K = K
 
+    def draw(self, m=1):
+        n = len(self.domain)
+        A = np.linalg.cholesky(self.K + np.eye(n) * 1E-7)
+        sample = np.random.normal(size=(n, m))
+        return self.mu.reshape((-1, 1)) + A.dot(sample)
+
     def sample_most_uncertain(self):
         '''
         This function determines the next sample to run based on
@@ -190,6 +196,7 @@ class GPR_BO:
         cov_vec = self.K[x]
         mu_new = self.mu + (sy - self.mu[x]) / (self.K[x, x] + err) * cov_vec
         Sig_new = self.K - np.outer(self.K[x, :], self.K[:, x]) / (self.K[x, x] + err)
+
         self.mu, self.K = mu_new, Sig_new
 
 
@@ -200,10 +207,10 @@ if __name__ == "__main__":
     f1 = lambda x: -f2(x)
     kern = "mk52"
 
-    domain = np.arange(-5.1, 5.1, 0.01)
+    domain = np.arange(-5.1, 5.1, 0.1)
     opt = GPR_BO(domain, kern=kern)
     # Using a simple test function, generate training data
-    opt.sampled_indices = list(np.random.choice(range(len(domain)), 3, replace=False))
+    opt.sampled_indices = list(np.random.choice(range(len(domain)), 2, replace=False))
     train_x = np.array(list(map(lambda x: domain[x], opt.sampled_indices)))
     train_y = np.array(list(map(f1, train_x)))
 
@@ -243,7 +250,7 @@ if __name__ == "__main__":
         color="dodgerblue"
     )
     plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
-    plt.legend()
+    plt.legend(loc="upper left")
     plt.ylim(-10.0, 10.0)
     plt.savefig("imgs/%03d.png" % (0))
     plt.close()
@@ -268,9 +275,9 @@ if __name__ == "__main__":
         full_sample_x.append(sample_x)
         full_sample_y.append(sample_y)
 
-        plt.scatter(full_sample_x, full_sample_y, color="orange", label="Sampled")
+        # plt.scatter(full_sample_x, full_sample_y, color="orange", label="Sampled")
 
-        plt.plot(domain, means[-1], color="dodgerblue", label="%d" % i)
+        plt.plot(domain, means[-1], color="dodgerblue")  #, label="%d" % i)
         plt.fill_between(
             domain,
             means[-1] + 2.0 * stds[-1],
@@ -278,12 +285,32 @@ if __name__ == "__main__":
             alpha=0.5,
             color="dodgerblue"
         )
-        plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
-        plt.legend()
-        # plt.show()
+        # plt.plot(domain, list(map(f1, domain)), color="orange", label="EXACT")
+
+        plt.plot(domain, opt.draw(), color="red", label="Experiment")
+        plt.plot(domain, opt.draw(), color="blue", label="DFT")
+        plt.plot(domain, opt.draw(), color="green", label="MD")
+
+        # plt.tick_params(
+        #     axis='x',          # changes apply to the x-axis
+        #     which='both',      # both major and minor ticks are affected
+        #     bottom=False,      # ticks along the bottom edge are off
+        #     top=False,         # ticks along the top edge are off
+        #     left=False,
+        #     right=False,
+        #     labelleft=False,
+        #     labelbottom=False) # labels along the bottom edge are off
+        plt.tick_params(axis='both', which='both', bottom='off', top='off', labelbottom='off', right='off', left='off', labelleft='off')
+
+        # plt.axis('off')
+
+        plt.legend(loc="upper left", fontsize=18)
         plt.ylim(-10.0, 10.0)
-        plt.savefig("imgs/%03d.png" % (i + 1))
-        plt.close()
+        plt.show()
+        # break
+        # plt.ylim(-10.0, 10.0)
+        # plt.savefig("imgs/%03d.png" % (i + 1))
+        # plt.close()
 
     # cmd = "convert -delay 10 -loop 0 $(ls -v imgs/*.png) output.gif"
     # os.system(cmd)
