@@ -1,2 +1,2 @@
-from gprbo.kernels import matern
-from gprbo.kernels import periodic
+from kernels import matern
+from kernels import periodic
